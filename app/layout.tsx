@@ -36,11 +36,11 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
       <body suppressHydrationWarning className="bg-bg-primary text-text-primary min-h-screen flex flex-col">
         <AuthProvider>
           <NotificationManager />
-          <div className="flex flex-col sm:flex-row h-screen overflow-hidden">
+          <div className="flex flex-col sm:flex-row h-[100dvh] overflow-hidden">
             <Sidebar />
-            <div className="flex-1 flex flex-col sm:ml-0">
+            <div className="flex-1 flex flex-col min-w-0">
               <Titlebar />
-              <main className="flex-1 overflow-y-auto p-[var(--space-base)] pb-[clamp(80px,10vh,100px)] sm:pb-[var(--space-base)]">
+              <main className="flex-1 overflow-y-auto overscroll-contain sm:p-[var(--space-base)] p-0 [webkit-overflow-scrolling:touch]">
                 <ClientLayout>
                   {children}
                 </ClientLayout>
