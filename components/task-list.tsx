@@ -21,16 +21,16 @@ interface Task {
   category: 'personal' | 'work';
   dueDate?: string;
   userId: string;
-  color?: string;
+  priority?: string;
 }
 
-const PRIORITY_COLORS = [
-  { name: 'Default', value: 'gray', class: 'bg-surface-hover text-text-secondary border-border-default', indicator: 'bg-text-tertiary' },
-  { name: 'High', value: 'red', class: 'bg-accent-red/10 text-accent-red border-accent-red/20', indicator: 'bg-accent-red' },
-  { name: 'Medium', value: 'orange', class: 'bg-orange-500/10 text-orange-500 border-orange-500/20', indicator: 'bg-orange-500' },
-  { name: 'Low', value: 'blue', class: 'bg-accent-blue/10 text-accent-blue border-accent-blue/20', indicator: 'bg-accent-blue' },
-  { name: 'Optional', value: 'green', class: 'bg-accent-green/10 text-accent-green border-accent-green/20', indicator: 'bg-accent-green' },
-];
+const PRIORITY_COLORS: Record<string, { name: string, class: string, indicator: string, value: string }> = {
+  default: { name: 'Default', value: 'gray', class: 'bg-surface-hover text-text-secondary border-border-default', indicator: 'bg-text-tertiary' },
+  high: { name: 'High', value: 'red', class: 'bg-accent-red/10 text-accent-red border-accent-red/20', indicator: 'bg-accent-red' },
+  medium: { name: 'Medium', value: 'orange', class: 'bg-orange-500/10 text-orange-500 border-orange-500/20', indicator: 'bg-orange-500' },
+  low: { name: 'Low', value: 'blue', class: 'bg-accent-blue/10 text-accent-blue border-accent-blue/20', indicator: 'bg-accent-blue' },
+  optional: { name: 'Optional', value: 'green', class: 'bg-accent-green/10 text-accent-green border-accent-green/20', indicator: 'bg-accent-green' },
+};
 
 interface TaskItemProps {
   task: Task;
@@ -55,7 +55,7 @@ const TaskItem = ({
 }: TaskItemProps) => {
   const isDone = task.status === 'done';
   const isCancelled = task.status === 'cancelled';
-  const priorityColor = PRIORITY_COLORS.find(c => c.value === (task.color || 'gray')) || PRIORITY_COLORS[0];
+  const priorityColor = PRIORITY_COLORS[task.priority || 'default'] || PRIORITY_COLORS.default;
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const startPos = useRef<{ x: number, y: number } | null>(null);
@@ -179,7 +179,7 @@ const TaskItem = ({
                 )}>
                   {task.title}
                 </span>
-                {!isDone && !isCancelled && task.color && task.color !== 'gray' && (
+                {!isDone && !isCancelled && task.priority && task.priority !== 'default' && (
                   <span className={cn("text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter", priorityColor.class)}>
                     {priorityColor.name}
                   </span>
@@ -230,7 +230,7 @@ export function TaskList() {
   const [loading, setLoading] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
-  const [newTaskColor, setNewTaskColor] = useState('gray');
+  const [newTaskPriority, setNewTaskPriority] = useState('default');
   const [isPriorityOpen, setIsPriorityOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'personal' | 'work'>('personal');
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
@@ -305,7 +305,7 @@ export function TaskList() {
       status: 'todo',
       category: activeTab,
       userId: user.id,
-      color: newTaskColor,
+      priority: newTaskPriority,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -329,7 +329,7 @@ export function TaskList() {
       if (error) throw error;
       
       setNewTaskTitle('');
-      setNewTaskColor('gray');
+      setNewTaskPriority('default');
       if (!dateFilter) {
         setNewTaskDueDate('');
       }
@@ -388,7 +388,7 @@ export function TaskList() {
           title: taskToEdit.title,
           description: taskToEdit.description,
           dueDate: taskToEdit.dueDate,
-          color: taskToEdit.color,
+          priority: taskToEdit.priority,
           status: taskToEdit.status,
           updatedAt: new Date().toISOString(),
         })
@@ -591,8 +591,8 @@ export function TaskList() {
                   className="w-full h-11 sm:h-10 bg-bg-primary border border-border-default rounded-md px-3 text-sm text-text-primary flex items-center justify-between hover:border-border-focus transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <div className={cn("w-2.5 h-2.5 rounded-full", PRIORITY_COLORS.find(c => c.value === newTaskColor)?.indicator)} />
-                    {PRIORITY_COLORS.find(c => c.value === newTaskColor)?.name}
+                    <div className={cn("w-2.5 h-2.5 rounded-full", (PRIORITY_COLORS[newTaskPriority] || PRIORITY_COLORS.default).indicator)} />
+                    {(PRIORITY_COLORS[newTaskPriority] || PRIORITY_COLORS.default).name}
                   </div>
                   <ChevronDown className={cn("w-4 h-4 text-text-tertiary transition-transform", isPriorityOpen && "rotate-180")} />
                 </button>
@@ -610,21 +610,21 @@ export function TaskList() {
                         exit={{ opacity: 0, y: -10 }}
                         className="absolute top-full left-0 right-0 mt-1 bg-surface-default border border-border-default rounded-md shadow-lg z-50 overflow-hidden"
                       >
-                        {PRIORITY_COLORS.map(color => (
+                        {Object.entries(PRIORITY_COLORS).map(([key, priority]) => (
                           <button
-                            key={color.value}
+                            key={key}
                             type="button"
                             onClick={() => {
-                              setNewTaskColor(color.value);
+                              setNewTaskPriority(key);
                               setIsPriorityOpen(false);
                             }}
                             className={cn(
                               "w-full px-3 py-2.5 text-sm text-left flex items-center gap-3 hover:bg-surface-hover transition-colors",
-                              newTaskColor === color.value && "bg-surface-active font-medium"
+                              newTaskPriority === key && "bg-surface-active font-medium"
                             )}
                           >
-                            <div className={cn("w-3 h-3 rounded-full", color.indicator)} />
-                            {color.name}
+                            <div className={cn("w-3 h-3 rounded-full", priority.indicator)} />
+                            {priority.name}
                           </button>
                         ))}
                       </motion.div>
@@ -785,8 +785,8 @@ export function TaskList() {
             <h4 className="font-medium text-text-primary mb-2">{showCreateConfirm?.title}</h4>
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <span className="flex items-center">
-                <div className={cn("w-2 h-2 rounded-full mr-1.5", PRIORITY_COLORS.find(c => c.value === showCreateConfirm?.color)?.indicator)} />
-                {PRIORITY_COLORS.find(c => c.value === showCreateConfirm?.color)?.name}
+                <div className={cn("w-2 h-2 rounded-full mr-1.5", (PRIORITY_COLORS[showCreateConfirm?.priority] || PRIORITY_COLORS.default).indicator)} />
+                {(PRIORITY_COLORS[showCreateConfirm?.priority] || PRIORITY_COLORS.default).name}
               </span>
               {showCreateConfirm?.dueDate && (
                 <span className="flex items-center">
@@ -829,18 +829,18 @@ export function TaskList() {
             <div className="space-y-2">
               <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Priority</label>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {PRIORITY_COLORS.map(color => (
+                {Object.entries(PRIORITY_COLORS).map(([key, priority]) => (
                   <button
-                    key={color.value}
+                    key={key}
                     type="button"
-                    onClick={() => setTaskToEdit({...taskToEdit, color: color.value})}
+                    onClick={() => setTaskToEdit({...taskToEdit, priority: key})}
                     className={cn(
                       "flex flex-col items-center gap-1.5 p-2 border rounded-md transition-all",
-                      taskToEdit.color === color.value ? "border-accent-blue bg-accent-blue/5" : "border-border-default hover:border-border-focus"
+                      taskToEdit.priority === key ? "border-accent-blue bg-accent-blue/5" : "border-border-default hover:border-border-focus"
                     )}
                   >
-                    <div className={cn("w-3 h-3 rounded-full", color.indicator)} />
-                    <span className="text-[10px] font-medium">{color.name}</span>
+                    <div className={cn("w-3 h-3 rounded-full", priority.indicator)} />
+                    <span className="text-[10px] font-medium">{priority.name}</span>
                   </button>
                 ))}
               </div>

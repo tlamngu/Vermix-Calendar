@@ -44,15 +44,15 @@ interface Task {
   category: 'personal' | 'work';
   dueDate?: string;
   userId: string;
-  color?: string;
+  priority?: string;
 }
 
-const TASK_COLORS: Record<string, string> = {
-  gray: 'bg-surface-hover text-text-tertiary',
-  red: 'bg-accent-red/20 text-accent-red',
-  orange: 'bg-orange-500/20 text-orange-500',
-  blue: 'bg-accent-blue/20 text-accent-blue',
-  green: 'bg-accent-green/20 text-accent-green',
+const PRIORITY_COLORS: Record<string, string> = {
+  default: 'bg-surface-hover text-text-tertiary',
+  high: 'bg-accent-red/20 text-accent-red',
+  medium: 'bg-orange-500/20 text-orange-500',
+  low: 'bg-accent-blue/20 text-accent-blue',
+  optional: 'bg-accent-green/20 text-accent-green',
 };
 
 export function CalendarView() {
@@ -304,7 +304,7 @@ export function CalendarView() {
                       ? 'bg-surface-hover text-text-tertiary line-through opacity-50' 
                       : task.status === 'cancelled'
                       ? 'bg-surface-hover text-text-tertiary line-through opacity-30 grayscale'
-                      : TASK_COLORS[task.color || 'gray'] || TASK_COLORS.gray
+                      : PRIORITY_COLORS[task.priority || 'default'] || PRIORITY_COLORS.default
                   )}
                   title={`Go to ${task.category} tasks`}
                 >

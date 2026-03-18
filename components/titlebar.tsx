@@ -9,7 +9,7 @@ export function Titlebar() {
   return (
     <motion.div 
       layout
-      className="h-[clamp(44px,6vh,56px)] sm:ml-[70px] bg-bg-primary border-b border-border-subtle flex items-center justify-between px-[var(--space-base)] sticky top-0 z-30"
+      className="h-[clamp(44px,6vh,56px)] bg-bg-primary border-b border-border-subtle flex items-center justify-between px-[var(--space-base)] z-30"
     >
       <div className="text-[10px] sm:text-xs font-medium text-text-secondary tracking-wider uppercase">
         Vermix Calendar

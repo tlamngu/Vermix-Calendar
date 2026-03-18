@@ -7,13 +7,95 @@ import { LogOut, Key, Trash2, Copy, Bell } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
+import Select from 'react-select';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const [mcpKeys, setMcpKeys] = useState<{ id: string, key: string, createdAt: string }[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState(15);
+  const [timezone, setTimezone] = useState('UTC');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const timezoneOptions = (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl)
+    ? Intl.supportedValuesOf('timeZone').map(tz => ({ value: tz, label: tz }))
+    : [
+      'UTC',
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'Europe/London',
+      'Europe/Paris',
+      'Asia/Tokyo',
+      'Asia/Shanghai',
+      'Asia/Singapore',
+      'Australia/Sydney'
+    ].map(tz => ({ value: tz, label: tz }));
+
+  const selectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: 'var(--color-bg-primary)',
+      borderColor: state.isFocused ? 'var(--color-border-focus)' : 'var(--color-border-default)',
+      color: 'var(--color-text-primary)',
+      borderRadius: '0 !important',
+      boxShadow: 'none !important',
+      minHeight: '48px',
+      '&:hover': {
+        borderColor: 'var(--color-border-strong)',
+      }
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--color-bg-secondary)',
+      borderRadius: '0 !important',
+      border: '1px solid var(--color-border-default)',
+      boxShadow: 'none !important',
+      zIndex: 50,
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected 
+        ? 'var(--color-surface-selected)' 
+        : state.isFocused 
+          ? 'var(--color-surface-hover)' 
+          : 'transparent',
+      color: 'var(--color-text-primary)',
+      borderRadius: '0 !important',
+      cursor: 'pointer',
+      '&:active': {
+        backgroundColor: 'var(--color-surface-active)',
+      }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'var(--color-text-primary)',
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'var(--color-text-primary)',
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: 'var(--color-text-placeholder)',
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: 'var(--color-text-tertiary)',
+      '&:hover': {
+        color: 'var(--color-text-secondary)',
+      }
+    }),
+    indicatorSeparator: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--color-border-subtle)',
+    }),
+    clearIndicator: (base: any) => ({
+      ...base,
+      color: 'var(--color-text-tertiary)',
+    }),
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -34,12 +116,13 @@ export default function SettingsPage() {
     const fetchSettings = async () => {
       const { data, error } = await supabase
         .from('user_settings')
-        .select('reminder_minutes')
+        .select('reminder_minutes, timezone')
         .eq('user_id', user.id)
         .single();
       
       if (data && !error) {
         setReminderMinutes(data.reminder_minutes);
+        if (data.timezone) setTimezone(data.timezone);
       }
     };
 
@@ -63,6 +146,27 @@ export default function SettingsPage() {
       setReminderMinutes(minutes);
     } catch (error) {
       console.error('Error saving settings:', error);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const saveTimezoneSettings = async (tz: string) => {
+    if (!user) return;
+    setIsSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({ 
+          user_id: user.id, 
+          timezone: tz,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+      
+      if (error) throw error;
+      setTimezone(tz);
+    } catch (error) {
+      console.error('Error saving timezone settings:', error);
     } finally {
       setIsSavingSettings(false);
     }
@@ -182,6 +286,24 @@ export default function SettingsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="border-t border-border-default pt-4 mt-4">
+                <label className="text-sm font-medium text-text-secondary block mb-2">
+                  Timezone
+                </label>
+                <p className="text-xs text-text-tertiary mb-4">
+                  Select your local timezone for accurate time-based tasks and reminders.
+                </p>
+                <Select
+                  value={timezoneOptions.find(opt => opt.value === timezone)}
+                  onChange={(opt: any) => saveTimezoneSettings(opt.value)}
+                  options={timezoneOptions}
+                  styles={selectStyles}
+                  isDisabled={isSavingSettings}
+                  placeholder="Search timezone..."
+                  classNamePrefix="react-select"
+                />
               </div>
             </div>
           </Card>

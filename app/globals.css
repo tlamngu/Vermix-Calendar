@@ -49,7 +49,6 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;

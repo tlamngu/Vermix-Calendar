@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, CheckSquare, Settings, LogOut } from 'lucide-react';
+import { Calendar, CheckSquare, Settings, LogOut, Sparkles } from 'lucide-react';
 import { useAuth } from './auth-provider';
 import { cn } from '@/lib/utils';
 import { motion } from 'motion/react';
@@ -13,6 +13,7 @@ import { Modal } from './ui/modal';
 const navItems = [
   { icon: Calendar, href: '/', label: 'Calendar' },
   { icon: CheckSquare, href: '/tasks', label: 'Tasks' },
+  { icon: Sparkles, href: '/assistant', label: 'Assistant' },
   { icon: Settings, href: '/settings', label: 'Settings' },
 ];
 
@@ -25,7 +26,7 @@ export function Sidebar() {
     <>
       <motion.div 
         layout
-        className="fixed bottom-0 left-0 right-0 h-[clamp(64px,8vh,80px)] bg-bg-secondary/90 backdrop-blur-md border-t border-border-subtle flex items-center justify-around px-2 z-40 sm:top-0 sm:bottom-0 sm:left-0 sm:right-auto sm:w-[70px] sm:h-full sm:flex-col sm:border-t-0 sm:border-r sm:py-4 sm:justify-start"
+        className="h-[clamp(64px,8vh,80px)] bg-bg-secondary/90 backdrop-blur-md border-t border-border-subtle flex items-center justify-around px-2 z-40 sm:w-[70px] sm:h-full sm:flex-col sm:border-t-0 sm:border-r sm:py-4 sm:justify-start order-last sm:order-first"
       >
         <div className="hidden sm:flex w-[70px] h-[70px] items-center justify-center mb-8">
           <div className="w-10 h-10 bg-accent-blue/20 flex items-center justify-center">
