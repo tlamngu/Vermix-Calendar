@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #0a0a0a;
+  --color-bg-secondary: #111111;
+  --color-bg-tertiary: #1a1a1a;
+  --color-bg-quaternary: #222222;
+
+  --color-surface-default: rgba(255, 255, 255, 0.03);
+  --color-surface-hover: rgba(255, 255, 255, 0.06);
+  --color-surface-active: rgba(255, 255, 255, 0.10);
+  --color-surface-selected: rgba(255, 255, 255, 0.12);
+
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.15);
+  --color-border-focus: rgba(255, 255, 255, 0.30);
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgba(255, 255, 255, 0.70);
+  --color-text-tertiary: rgba(255, 255, 255, 0.50);
+  --color-text-disabled: rgba(255, 255, 255, 0.30);
+  --color-text-placeholder: rgba(255, 255, 255, 0.40);
+
+  --color-accent-primary: #ffffff;
+  --color-accent-blue: #5588ff;
+  --color-accent-green: #44ff88;
+  --color-accent-orange: #ff7744;
+  --color-accent-red: #ff4477;
+  --color-accent-purple: #aa44ff;
+  --color-accent-cyan: #44ddff;
+
+  --font-sans: var(--font-lexend), sans-serif;
+}
+
+@layer base {
+  :root {
+    /* Fluid typography: 14px -> 16px */
+    --text-base: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+    /* Fluid headings: 24px -> 32px */
+    --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+    /* Fluid spacing: 16px -> 24px */
+    --space-base: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+  }
+
+  body {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    touch-action: manipulation;
+  }
+
+  button, 
+  a, 
+  input, 
+  select, 
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Versys Flat overrides */
+  * {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-primary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-active);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-surface-selected);
+  }
+}
