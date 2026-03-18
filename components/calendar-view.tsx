@@ -40,7 +40,7 @@ interface Event {
 interface Task {
   id: string;
   title: string;
-  status: 'todo' | 'in-progress' | 'done';
+  status: 'todo' | 'in-progress' | 'done' | 'cancelled';
   category: 'personal' | 'work';
   dueDate?: string;
   userId: string;
@@ -302,6 +302,8 @@ export function CalendarView() {
                     "text-[10px] px-2 py-1 truncate flex items-center gap-1.5 rounded-md cursor-pointer transition-colors active:opacity-70",
                     task.status === 'done' 
                       ? 'bg-surface-hover text-text-tertiary line-through opacity-50' 
+                      : task.status === 'cancelled'
+                      ? 'bg-surface-hover text-text-tertiary line-through opacity-30 grayscale'
                       : TASK_COLORS[task.color || 'gray'] || TASK_COLORS.gray
                   )}
                   title={`Go to ${task.category} tasks`}

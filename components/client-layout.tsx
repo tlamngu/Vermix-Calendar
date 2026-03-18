@@ -1,10 +1,18 @@
 'use client';
-
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => document.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
 
   return (
     <AnimatePresence mode="wait">
