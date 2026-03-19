@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { getAdminDb } from '@/lib/supabase-admin';
+import { after } from 'next/server';
 
 export async function POST(req: Request) {
   try {
@@ -410,200 +411,182 @@ Only include <task-table> when you actually want the UI to render a task table.
       });
     }
 
-    // ================ STREAM + MULTI-TURN TOOL ORCHESTRATION ================
+    // Create placeholder for assistant message
+    let assistantMessageId: string | null = null;
+    let currentParts: any[] = [];
+    let accumulatedContent = '';
 
-    const encoder = new TextEncoder();
+    if (sessionId) {
+      const { data } = await (supabase as any)
+        .from('chat_messages')
+        .insert({
+          session_id: sessionId,
+          user_id: userId,
+          role: 'assistant',
+          content: '',
+          parts: [],
+        })
+        .select('id')
+        .single();
+      if (data) assistantMessageId = data.id;
+    }
 
-    const customStream = new ReadableStream({
-      async start(controller) {
-        let accumulatedAssistantText = '';
+    const updateAssistantMessage = async () => {
+      if (!assistantMessageId) return;
+      await (supabase as any)
+        .from('chat_messages')
+        .update({
+          content: accumulatedContent,
+          parts: currentParts,
+        })
+        .eq('id', assistantMessageId);
+    };
 
-        try {
-          let currentMessages = [...chatMessages];
+    // ================ DETACHED MULTI-TURN TOOL ORCHESTRATION ================
 
-          // Multi-round loop: model -> tools -> model -> ...
-          // Dừng khi model không còn tool_calls nữa.
-          for (let round = 0; round < 5; round++) {
-            const toolCallsBuffer: {
-              id: string;
-              type: 'function';
-              function: { name: string; arguments: string };
-            }[] = [];
-            let hasToolCalls = false;
+    after(async () => {
+      try {
+        let currentMessages = [...chatMessages];
 
-            const stream = await openai.chat.completions.create({
-              model,
-              messages: currentMessages,
-              tools,
-              tool_choice: 'auto',
-              stream: true,
-            });
+        // Multi-round loop: model -> tools -> model -> ...
+        for (let round = 0; round < 5; round++) {
+          const stream = await openai.chat.completions.create({
+            model,
+            messages: currentMessages,
+            tools,
+            tool_choice: 'auto',
+            stream: true,
+          });
 
-            let roundAssistantText = '';
+          let roundAssistantText = '';
+          const toolCallsBuffer: { id: string; type: 'function'; function: { name: string; arguments: string } }[] = [];
+          let hasToolCalls = false;
+          
+          let lastDbUpdate = Date.now();
+          const DB_THROTTLE_MS = 250;
 
-            for await (const chunk of stream) {
-              const delta = chunk.choices?.[0]?.delta;
-              if (!delta) continue;
+          let textPartIndex = currentParts.length;
+          currentParts.push({ type: 'text', text: '' });
 
-              // Content streaming
-              if (delta.content) {
-                roundAssistantText += delta.content;
-                accumulatedAssistantText += delta.content;
+          for await (const chunk of stream) {
+            const delta = chunk.choices?.[0]?.delta;
+            if (!delta) continue;
 
-                // Gửi về client theo format useChat "0:..."
-                controller.enqueue(
-                  encoder.encode(`0:${JSON.stringify(delta.content)}\n`),
-                );
+            if (delta.content) {
+              roundAssistantText += delta.content;
+              accumulatedContent += delta.content;
+              currentParts[textPartIndex].text = roundAssistantText;
+              
+              const now = Date.now();
+              if (now - lastDbUpdate > DB_THROTTLE_MS) {
+                lastDbUpdate = now;
+                await updateAssistantMessage();
               }
+            }
 
-              // Tool calls streaming (delta)
-              if (delta.tool_calls) {
-                hasToolCalls = true;
-
-                for (const tc of delta.tool_calls) {
-                  if (typeof tc.index !== 'number') continue;
-
-                  if (!toolCallsBuffer[tc.index]) {
-                    toolCallsBuffer[tc.index] = {
-                      id: tc.id || '',
-                      type: 'function',
-                      function: {
-                        name: '',
-                        arguments: '',
-                      },
-                    };
-                  }
-
-                  const buf = toolCallsBuffer[tc.index];
-
-                  if (tc.id) buf.id = tc.id;
-                  if (tc.function?.name)
-                    buf.function.name += tc.function.name;
-                  if (tc.function?.arguments)
-                    buf.function.arguments += tc.function.arguments;
+            if (delta.tool_calls) {
+              hasToolCalls = true;
+              for (const tc of delta.tool_calls) {
+                const index = tc.index;
+                if (typeof index !== 'number') continue;
+                if (!toolCallsBuffer[index]) {
+                  toolCallsBuffer[index] = { id: tc.id || '', type: 'function', function: { name: '', arguments: '' } };
                 }
+                const buf = toolCallsBuffer[index];
+                if (tc.id) buf.id = tc.id;
+                if (tc.function?.name) buf.function.name += tc.function.name;
+                if (tc.function?.arguments) buf.function.arguments += tc.function.arguments;
               }
-            } // end for-await chunk
-
-            // Nếu không có tool_calls, coi như đây là câu trả lời cuối
-            if (!hasToolCalls) {
-              if (roundAssistantText) {
-                currentMessages.push({
-                  role: 'assistant',
-                  content: roundAssistantText,
-                });
-              }
-              break;
             }
+          }
+          
+          // Final flush for this round's text
+          if (!roundAssistantText && currentParts[textPartIndex].text === '') {
+            currentParts.pop();
+          } else {
+            await updateAssistantMessage();
+          }
 
-            // Có tool calls -> thêm assistant message với tool_calls vào history
-            const normalizedToolCalls = toolCallsBuffer.filter(
-              tc => tc?.id && tc?.function?.name,
-            );
-
-            if (normalizedToolCalls.length === 0) {
-              break;
-            }
-
+          if (roundAssistantText) {
             currentMessages.push({
               role: 'assistant',
-              content: '',
-              tool_calls: normalizedToolCalls.map((tc) => ({
-                id: tc.id,
-                type: 'function',
-                function: {
-                  name: tc.function.name,
-                  arguments: tc.function.arguments,
-                },
-              })),
-            } as any);
-
-            // Thực thi từng tool và append kết quả
-            for (const tc of normalizedToolCalls) {
-              let argsObj: any = {};
-              try {
-                argsObj =
-                  typeof tc.function.arguments === 'string'
-                    ? JSON.parse(tc.function.arguments || '{}')
-                    : tc.function.arguments || {};
-              } catch {
-                argsObj = {};
-              }
-
-              controller.enqueue(
-                encoder.encode(
-                  `a:${JSON.stringify({
-                    phase: 'start',
-                    toolCallId: tc.id,
-                    toolName: tc.function.name,
-                    args: argsObj,
-                    at: new Date().toISOString(),
-                  })}\n`,
-                ),
-              );
-
-              const toolStart = Date.now();
-
-              const toolResult = await executeTool(
-                tc.function.name,
-                argsObj,
-              );
-
-              // push tool message
-              currentMessages.push({
-                role: 'tool',
-                tool_call_id: tc.id,
-                content: toolResult,
-              } as any);
-
-              // Gửi event tool về client theo format "a:..."
-              controller.enqueue(
-                encoder.encode(
-                  `a:${JSON.stringify({
-                    phase: 'complete',
-                    toolCallId: tc.id,
-                    toolName: tc.function.name,
-                    args: argsObj,
-                    result: toolResult,
-                    durationMs: Date.now() - toolStart,
-                    at: new Date().toISOString(),
-                  })}\n`,
-                ),
-              );
-            }
-
-            // Vòng lặp tiếp theo: model sẽ thấy tool results trong currentMessages
-          }
-
-          // Lưu assistant message cuối cùng vào DB
-          if (sessionId && accumulatedAssistantText) {
-            await (supabase as any).from('chat_messages').insert({
-              session_id: sessionId,
-              user_id: userId,
-              role: 'assistant',
-              content: accumulatedAssistantText,
-              parts: [
-                {
-                  type: 'text',
-                  text: accumulatedAssistantText,
-                },
-              ],
+              content: roundAssistantText,
             });
           }
 
-          controller.close();
-        } catch (err) {
-          console.error('Streaming / orchestration error:', err);
-          controller.error(err);
+          if (!hasToolCalls) {
+            break; // No more tools to run, we are done
+          }
+
+          const normalizedToolCalls = toolCallsBuffer.filter(tc => tc?.id && tc?.function?.name);
+          if (normalizedToolCalls.length === 0) break;
+
+          currentMessages.push({
+            role: 'assistant',
+            content: '',
+            tool_calls: normalizedToolCalls.map((tc) => ({
+              id: tc.id,
+              type: 'function',
+              function: {
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+              },
+            })),
+          } as any);
+
+          // Execute tools
+          for (const tc of normalizedToolCalls) {
+            let argsObj: any = {};
+            try {
+              argsObj = JSON.parse(tc.function.arguments || '{}');
+            } catch {
+              argsObj = {};
+            }
+
+            // Mark tool invocation starting
+            currentParts.push({
+              type: 'tool-invocation',
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              args: argsObj,
+              status: 'running',
+              startedAt: new Date().toISOString(),
+            });
+            await updateAssistantMessage();
+
+            const toolStart = Date.now();
+            const toolResult = await executeTool(tc.function.name, argsObj);
+
+            // Add tool response to history
+            currentMessages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: toolResult,
+            } as any);
+
+            // Update part to completed
+            const lastPart = currentParts[currentParts.length - 1];
+            if (lastPart && lastPart.type === 'tool-invocation' && lastPart.toolCallId === tc.id) {
+              lastPart.status = 'completed';
+              lastPart.result = parseToolResult(toolResult);
+              lastPart.completedAt = new Date().toISOString();
+              lastPart.durationMs = Date.now() - toolStart;
+            }
+            await updateAssistantMessage();
+          }
         }
-      },
+      } catch (err) {
+        console.error('Detached loop error:', err);
+        if (assistantMessageId) {
+          accumulatedContent += '\n\nAn error occurred while processing.';
+          currentParts.push({ type: 'text', text: 'An error occurred while processing.' });
+          await updateAssistantMessage();
+        }
+      }
     });
 
-    return new Response(customStream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'x-vercel-ai-data-stream': 'v1',
-      },
+    return new Response(JSON.stringify({ success: true, messageId: assistantMessageId }), {
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
     console.error('Chat API Error (OpenAI SDK):', error);
@@ -611,4 +594,15 @@ Only include <task-table> when you actually want the UI to render a task table.
       status: 500,
     });
   }
+}
+
+function parseToolResult(result: unknown) {
+  if (typeof result === 'string') {
+    try {
+      return JSON.parse(result);
+    } catch {
+      return result;
+    }
+  }
+  return result;
 }

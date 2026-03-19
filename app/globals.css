@@ -83,4 +83,12 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-surface-selected);
   }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

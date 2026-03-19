@@ -7,6 +7,7 @@ import { useChat } from '@/lib/hooks/use-chat';
 import { Bot, Send, Settings, Plus, Trash2, Menu, X, Sparkles, Search, Loader2, ChevronDown, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Modal } from '@/components/ui/modal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -155,121 +156,52 @@ export default function AssistantPage() {
   const { messages, isLoading, append, setMessages } = useChat({
     api: '/api/chat',
     body: chatBody,
-    onFinish: () => {
-      setToolActivities(prev =>
-        prev.map(item =>
-          item.status === 'running'
-            ? {
-                ...item,
-                status: 'completed',
-                summary: 'Completed',
-                completedAt: new Date().toISOString(),
-              }
-            : item,
-        ),
-      );
-      addLog('info', 'AI response completed');
-      scrollToBottom();
-    },
     onError: (err: any) => {
-      setToolActivities(prev =>
-        prev.map(item =>
-          item.status === 'running'
-            ? {
-                ...item,
-                status: 'failed',
-                summary: 'Interrupted by API error',
-                completedAt: new Date().toISOString(),
-              }
-            : item,
-        ),
-      );
       addLog('error', `Chat error: ${err.message || 'Unknown error'}`);
       console.error('Chat error details:', err);
     },
-    onToolEvent: (event: any) => {
-      const toolCallId = event?.toolCallId;
-      const toolName = event?.toolName;
-
-      if (!toolCallId || !toolName) return;
-
-      if (event.phase === 'start') {
-        setToolActivities(prev => {
-          const existingIndex = prev.findIndex(
-            item => item.toolCallId === toolCallId,
-          );
-
-          const nextItem: ToolActivity = {
-            toolCallId,
-            toolName,
-            status: 'running',
-            summary: 'Running...',
-            args: event.args,
-            startedAt: event.at || new Date().toISOString(),
-          };
-
-          if (existingIndex === -1) {
-            return [...prev, nextItem];
-          }
-
-          const next = [...prev];
-          next[existingIndex] = {
-            ...next[existingIndex],
-            ...nextItem,
-          };
-          return next;
-        });
-
-        addLog('process', `Tool started: ${normalizeToolName(toolName)}`);
-        return;
-      }
-
-      const parsedResult = parseToolResult(event.result);
-      const isFailure =
-        typeof parsedResult === 'object' &&
-        parsedResult !== null &&
-        (((parsedResult as any).success === false) ||
-          !!(parsedResult as any).error);
-
-      setToolActivities(prev => {
-        const existingIndex = prev.findIndex(
-          item => item.toolCallId === toolCallId,
-        );
-
-        const nextItem: ToolActivity = {
-          toolCallId,
-          toolName,
-          status: isFailure ? 'failed' : 'completed',
-          summary: isFailure
-            ? (parsedResult as any)?.error || 'Tool failed'
-            : 'Completed',
-          args: event.args,
-          startedAt:
-            existingIndex >= 0
-              ? prev[existingIndex].startedAt
-              : event.at || new Date().toISOString(),
-          completedAt: event.at || new Date().toISOString(),
-          durationMs: event.durationMs,
-        };
-
-        if (existingIndex === -1) {
-          return [...prev, nextItem];
-        }
-
-        const next = [...prev];
-        next[existingIndex] = {
-          ...next[existingIndex],
-          ...nextItem,
-        };
-        return next;
-      });
-
-      addLog(
-        isFailure ? 'error' : 'info',
-        `${normalizeToolName(toolName)} ${isFailure ? 'failed' : 'completed'}`,
-      );
-    },
   });
+
+  const isGenerating = messages.length > 0 && (
+    messages[messages.length - 1].role === 'user' ||
+    (messages[messages.length - 1].role === 'assistant' && (
+      (messages[messages.length - 1].parts || []).some((p: any) => p.status === 'running') ||
+      (!messages[messages.length - 1].content && (!messages[messages.length - 1].parts || messages[messages.length - 1].parts?.length === 0 || (messages[messages.length - 1].parts?.length === 1 && !messages[messages.length - 1].parts![0].text)))
+    ))
+  );
+
+  // Derive toolActivities from the last assistant message
+  useEffect(() => {
+    if (messages.length === 0) {
+      setToolActivities([]);
+      return;
+    }
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role !== 'assistant' || !lastMsg.parts) {
+      if (lastMsg.role === 'user') setToolActivities([]);
+      return;
+    }
+    
+    // Extract tool invocations
+    const activities: ToolActivity[] = lastMsg.parts
+      .filter((p: any) => p.type === 'tool-invocation')
+      .map((p: any) => {
+         const isFailure = typeof p.result === 'object' && p.result !== null && (p.result.success === false || !!p.result.error);
+         const actualStatus = p.status === 'completed' && isFailure ? 'failed' : p.status;
+         return {
+           toolCallId: p.toolCallId,
+           toolName: p.toolName,
+           status: actualStatus,
+           summary: p.status === 'running' ? 'Running...' : (isFailure ? (p.result?.error || 'Tool failed') : 'Completed'),
+           args: p.args,
+           startedAt: p.startedAt,
+           completedAt: p.completedAt,
+           durationMs: p.durationMs
+         };
+      });
+      
+    setToolActivities(activities);
+  }, [messages]);
 
   // Debug log for chat configuration
   useEffect(() => {
@@ -288,7 +220,7 @@ export default function AssistantPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim()) return;
     
     if (!user?.id) {
       addLog('error', 'User session not found. Please refresh.');
@@ -452,6 +384,60 @@ export default function AssistantPage() {
   useEffect(() => {
     if (currentSessionId) {
       loadMessages(currentSessionId);
+      
+      const channel = supabase
+        .channel(`chat_messages_${currentSessionId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `session_id=eq.${currentSessionId}`,
+          },
+          (payload) => {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const newMsg = payload.new;
+              setMessages(prev => {
+                const existingIndex = prev.findIndex(m => m.id === newMsg.id);
+                const formatted = {
+                  id: newMsg.id,
+                  role: newMsg.role,
+                  content: newMsg.content || '',
+                  parts: newMsg.parts || [{ type: 'text', text: newMsg.content || '' }],
+                };
+                if (existingIndex >= 0) {
+                  const next = [...prev];
+                  next[existingIndex] = formatted;
+                  return next;
+                }
+                return [...prev, formatted];
+              });
+            } else if (payload.eventType === 'DELETE') {
+              setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          loadMessages(currentSessionId);
+        }
+      };
+      
+      const handleFocus = () => {
+        loadMessages(currentSessionId);
+      };
+
+      window.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        supabase.removeChannel(channel);
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleFocus);
+      };
     } else {
       setMessages([]);
     }
@@ -740,19 +726,26 @@ export default function AssistantPage() {
                   "px-3 sm:px-4 py-2 sm:py-3 rounded-2xl text-sm break-words",
                   m.role === 'user' ? "bg-surface-active text-text-primary rounded-tr-sm max-w-[85%]" : "bg-surface-default text-text-secondary max-w-[90%]"
                 )}>
+                  {m.role === 'assistant' && (!m.content && (!m.parts || m.parts.length === 0 || (m.parts.length === 1 && m.parts[0].type === 'text' && !m.parts[0].text))) && (
+                    <div className="flex items-center gap-2 text-text-tertiary h-5 sm:h-6">
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" />
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.4s' }} />
+                    </div>
+                  )}
                   {m.parts?.map((part, i) => {
-                    if (part.type === 'text') {
+                    if (part.type === 'text' && part.text) {
                       return (
                         <div key={i} className="markdown-body text-xs sm:text-sm leading-relaxed">
                           {renderMessageContent(part.text)}
                         </div>
                       );
                     }
-                    if (part.type === 'tool-invocation') {
+                    if (part.type === 'tool-invocation' && part.status === 'running') {
                       return (
-                        <div key={i} className="text-xs text-text-tertiary italic flex items-center gap-2">
-                          <Sparkles className="w-3 h-3" />
-                          Working on it...
+                        <div key={i} className="text-xs text-text-tertiary italic flex items-center gap-2 mt-1">
+                          <Sparkles className="w-3 h-3 animate-pulse text-accent-blue" />
+                          <span className="text-xs italic">Working on it...</span>
                         </div>
                       );
                     }
@@ -770,7 +763,7 @@ export default function AssistantPage() {
               </div>
             ))
           )}
-          {isLoading && toolActivities.length > 0 && (
+          {isGenerating && toolActivities.length > 0 && (
             <div className="max-w-3xl mx-auto px-2 sm:px-4 py-3 sm:py-4 rounded-2xl border border-border-subtle bg-surface-default/70 backdrop-blur-sm w-full">
               <div className="flex items-center justify-between mb-2 sm:mb-3 gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -829,12 +822,12 @@ export default function AssistantPage() {
               </div>
             </div>
           )}
-          {isLoading && messages[messages.length - 1]?.role === 'user' && (
-            <div className="flex gap-3 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0">
+          {(isLoading || (messages.length > 0 && messages[messages.length - 1].role === 'user')) && (
+            <div className="flex gap-3 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0 mt-4">
               <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
                 <Bot className="w-3 sm:w-4 h-3 sm:h-4 text-accent-blue" />
               </div>
-              <div className="px-3 sm:px-4 py-2 sm:py-3 text-text-tertiary text-xs sm:text-sm flex items-center gap-2">
+              <div className="px-3 sm:px-4 py-2 sm:py-3 rounded-2xl text-sm break-words bg-surface-default flex items-center gap-2 h-10 w-16">
                 <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" />
                 <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.2s' }} />
                 <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.4s' }} />
@@ -846,22 +839,38 @@ export default function AssistantPage() {
 
         {/* Input Area */}
         <div className="p-3 sm:p-4 bg-bg-primary border-t border-border-subtle shrink-0 w-full">
-          <form onSubmit={onSubmit} className="max-w-3xl mx-auto relative flex items-center">
-            <Input
-              value={input}
-              onChange={handleInputChange}
-              placeholder={activeSettings?.api_key ? "Ask Vermix Assistant..." : "Configure AI Settings to start"}
-              disabled={isLoading || !activeSettings?.api_key}
-              className="w-full pr-12 rounded-full bg-surface-default border-border-subtle focus:border-border-focus h-11 sm:h-12 text-sm"
-            />
-            <Button 
-              type="submit" 
-              disabled={isLoading || !input.trim() || !activeSettings?.api_key}
-              variant="icon"
-              className="absolute right-2 text-accent-blue hover:bg-accent-blue/10 w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+          <form 
+            onSubmit={onSubmit} 
+            className="max-w-3xl mx-auto relative flex items-end gap-2"
+          >
+            <div className="relative flex-1">
+              <Textarea
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.ctrlKey) {
+                    e.preventDefault();
+                    onSubmit(e as any);
+                  }
+                }}
+                placeholder={activeSettings?.api_key ? "Ask Vermix Assistant... (Ctrl+Enter to send)" : "Configure AI Settings to start"}
+                disabled={!activeSettings?.api_key}
+                rows={1}
+                className="w-full pr-12 rounded-2xl bg-surface-default border-border-subtle focus:border-border-focus min-h-[44px] max-h-[240px] text-sm py-3 scrollbar-hide"
+                style={{ 
+                  height: 'auto',
+                  overflowY: input.split('\n').length > 10 ? 'auto' : 'hidden' 
+                }}
+              />
+              <Button 
+                type="submit" 
+                disabled={!input.trim() || !activeSettings?.api_key}
+                variant="icon"
+                className="absolute right-2 bottom-1.5 text-accent-blue hover:bg-accent-blue/10 w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all bg-transparent border-0"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </form>
           <div className="flex items-center justify-between gap-2 mt-2 max-w-3xl mx-auto text-[9px] sm:text-[10px]">
             <span className="text-text-tertiary hidden sm:inline">Vermix Assistant can make mistakes. Check important info.</span>
