@@ -14,6 +14,7 @@ export interface UseChatOptions {
   body?: any;
   onFinish?: (message: Message) => void;
   onError?: (error: Error) => void;
+  onToolEvent?: (event: any) => void;
   initialMessages?: Message[];
 }
 
@@ -22,6 +23,7 @@ export function useChat({
   body = {},
   onFinish,
   onError,
+  onToolEvent,
   initialMessages = [],
 }: UseChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -34,6 +36,10 @@ export function useChat({
       parts: [{ type: 'text', text: message.content }],
     };
 
+    const outboundMessages = [...messages, userMessage].filter(
+      m => m.role !== 'tool'
+    );
+
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
@@ -43,7 +49,7 @@ export function useChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...body,
-          messages: [...messages, userMessage],
+          messages: outboundMessages,
         }),
       });
 
@@ -58,46 +64,61 @@ export function useChat({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantContent = '';
-      const assistantMessageId = (Date.now() + 1).toString();
+      let assistantMessageId: string | null = null;
+      let pending = '';
 
-      setMessages(prev => [...prev, { 
-        id: assistantMessageId, 
-        role: 'assistant', 
-        content: '',
-        parts: [{ type: 'text', text: '' }]
-      }]);
+      const upsertAssistantMessage = (nextContent: string) => {
+        if (!assistantMessageId) {
+          const newAssistantMessageId = (Date.now() + 1).toString();
+          assistantMessageId = newAssistantMessageId;
+          setMessages(prev => [
+            ...prev,
+            {
+              id: newAssistantMessageId,
+              role: 'assistant',
+              content: nextContent,
+              parts: [{ type: 'text', text: nextContent }],
+            },
+          ]);
+          return;
+        }
+
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantMessageId
+              ? {
+                  ...m,
+                  content: nextContent,
+                  parts: [{ type: 'text', text: nextContent }],
+                }
+              : m
+          )
+        );
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        pending += decoder.decode(value, { stream: true });
+        const lines = pending.split('\n');
+        pending = lines.pop() ?? '';
 
         for (const line of lines) {
+          if (!line) continue;
+
           if (line.startsWith('0:')) {
             try {
               const content = JSON.parse(line.slice(2));
               assistantContent += content;
-              setMessages(prev => prev.map(m => 
-                m.id === assistantMessageId ? { 
-                  ...m, 
-                  content: assistantContent,
-                  parts: [{ type: 'text', text: assistantContent }]
-                } : m
-              ));
+              upsertAssistantMessage(assistantContent);
             } catch (e) {
               console.error('Error parsing chunk', e);
             }
           } else if (line.startsWith('a:')) {
             try {
-              const toolResult = JSON.parse(line.slice(2));
-              setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'tool',
-                content: JSON.stringify(toolResult.result),
-                parts: [{ type: 'tool_result', toolName: toolResult.toolName, result: toolResult.result }]
-              }]);
+              const toolEvent = JSON.parse(line.slice(2));
+              onToolEvent?.(toolEvent);
             } catch (e) {
               console.error('Error parsing tool result', e);
             }
@@ -105,14 +126,41 @@ export function useChat({
         }
       }
 
-      const finalMessage: Message = { id: assistantMessageId, role: 'assistant', content: assistantContent };
-      onFinish?.(finalMessage);
+      if (pending.trim()) {
+        const line = pending.trim();
+        if (line.startsWith('0:')) {
+          try {
+            const content = JSON.parse(line.slice(2));
+            assistantContent += content;
+            upsertAssistantMessage(assistantContent);
+          } catch (e) {
+            console.error('Error parsing trailing chunk', e);
+          }
+        } else if (line.startsWith('a:')) {
+          try {
+            const toolEvent = JSON.parse(line.slice(2));
+            onToolEvent?.(toolEvent);
+          } catch (e) {
+            console.error('Error parsing trailing tool event', e);
+          }
+        }
+      }
+
+      if (assistantMessageId) {
+        const finalMessage: Message = {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: assistantContent,
+          parts: [{ type: 'text', text: assistantContent }],
+        };
+        onFinish?.(finalMessage);
+      }
     } catch (error: any) {
       onError?.(error);
     } finally {
       setIsLoading(false);
     }
-  }, [api, body, messages, onFinish, onError]);
+  }, [api, body, messages, onFinish, onError, onToolEvent]);
 
   return {
     messages,

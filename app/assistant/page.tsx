@@ -28,6 +28,43 @@ interface ChatSession {
   created_at: string;
 }
 
+interface ToolActivity {
+  toolCallId: string;
+  toolName: string;
+  status: 'running' | 'completed' | 'failed';
+  summary: string;
+  args?: any;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+}
+
+const normalizeToolName = (toolName: string) => {
+  const labels: Record<string, string> = {
+    createTask: 'Create task',
+    getTasks: 'Read tasks',
+    updateTask: 'Update task',
+    deleteTask: 'Delete task',
+    saveMemory: 'Save memory',
+    getMemories: 'Read memories',
+    getCurrentTime: 'Read current time',
+  };
+
+  return labels[toolName] || toolName;
+};
+
+const parseToolResult = (result: unknown) => {
+  if (typeof result === 'string') {
+    try {
+      return JSON.parse(result);
+    } catch {
+      return result;
+    }
+  }
+
+  return result;
+};
+
 const parseTaskTableXml = (xml: string) => {
   const taskRegex = /<task id="([^"]+)" task="([^"]+)" dueTime="([^"]+)" priority="([^"]+)" \/>/g;
   const tasks = [];
@@ -92,6 +129,7 @@ export default function AssistantPage() {
   // Log console state
   const [logs, setLogs] = useState<{ type: 'info' | 'error' | 'process', message: string, timestamp: Date }[]>([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -118,13 +156,119 @@ export default function AssistantPage() {
     api: '/api/chat',
     body: chatBody,
     onFinish: () => {
+      setToolActivities(prev =>
+        prev.map(item =>
+          item.status === 'running'
+            ? {
+                ...item,
+                status: 'completed',
+                summary: 'Completed',
+                completedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
       addLog('info', 'AI response completed');
       scrollToBottom();
     },
     onError: (err: any) => {
+      setToolActivities(prev =>
+        prev.map(item =>
+          item.status === 'running'
+            ? {
+                ...item,
+                status: 'failed',
+                summary: 'Interrupted by API error',
+                completedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
       addLog('error', `Chat error: ${err.message || 'Unknown error'}`);
       console.error('Chat error details:', err);
-    }
+    },
+    onToolEvent: (event: any) => {
+      const toolCallId = event?.toolCallId;
+      const toolName = event?.toolName;
+
+      if (!toolCallId || !toolName) return;
+
+      if (event.phase === 'start') {
+        setToolActivities(prev => {
+          const existingIndex = prev.findIndex(
+            item => item.toolCallId === toolCallId,
+          );
+
+          const nextItem: ToolActivity = {
+            toolCallId,
+            toolName,
+            status: 'running',
+            summary: 'Running...',
+            args: event.args,
+            startedAt: event.at || new Date().toISOString(),
+          };
+
+          if (existingIndex === -1) {
+            return [...prev, nextItem];
+          }
+
+          const next = [...prev];
+          next[existingIndex] = {
+            ...next[existingIndex],
+            ...nextItem,
+          };
+          return next;
+        });
+
+        addLog('process', `Tool started: ${normalizeToolName(toolName)}`);
+        return;
+      }
+
+      const parsedResult = parseToolResult(event.result);
+      const isFailure =
+        typeof parsedResult === 'object' &&
+        parsedResult !== null &&
+        (((parsedResult as any).success === false) ||
+          !!(parsedResult as any).error);
+
+      setToolActivities(prev => {
+        const existingIndex = prev.findIndex(
+          item => item.toolCallId === toolCallId,
+        );
+
+        const nextItem: ToolActivity = {
+          toolCallId,
+          toolName,
+          status: isFailure ? 'failed' : 'completed',
+          summary: isFailure
+            ? (parsedResult as any)?.error || 'Tool failed'
+            : 'Completed',
+          args: event.args,
+          startedAt:
+            existingIndex >= 0
+              ? prev[existingIndex].startedAt
+              : event.at || new Date().toISOString(),
+          completedAt: event.at || new Date().toISOString(),
+          durationMs: event.durationMs,
+        };
+
+        if (existingIndex === -1) {
+          return [...prev, nextItem];
+        }
+
+        const next = [...prev];
+        next[existingIndex] = {
+          ...next[existingIndex],
+          ...nextItem,
+        };
+        return next;
+      });
+
+      addLog(
+        isFailure ? 'error' : 'info',
+        `${normalizeToolName(toolName)} ${isFailure ? 'failed' : 'completed'}`,
+      );
+    },
   });
 
   // Debug log for chat configuration
@@ -158,6 +302,7 @@ export default function AssistantPage() {
     }
 
     addLog('process', `Sending message to ${activeSettings.name} (${activeSettings.model})...`);
+    setToolActivities([]);
     
     append({
       content: input,
@@ -611,19 +756,78 @@ export default function AssistantPage() {
                         </div>
                       );
                     }
-                    if (part.type === 'tool_result') {
-                      return (
-                        <div key={i} className="text-xs bg-surface-active p-2 rounded-md mt-2">
-                          <span className="font-medium text-accent-blue">Tool: {part.toolName}</span>
-                          <pre className="text-[10px] mt-1 overflow-x-auto">{JSON.stringify(part.result, null, 2)}</pre>
-                        </div>
-                      );
-                    }
+                    // if (part.type === 'tool_result') {
+                    //   return (
+                    //     <div key={i} className="text-xs bg-surface-active p-2 rounded-md mt-2">
+                    //       <span className="font-medium text-accent-blue">Tool: {part.toolName}</span>
+                    //       <pre className="text-[10px] mt-1 overflow-x-auto">{JSON.stringify(part.result, null, 2)}</pre>
+                    //     </div>
+                    //   );
+                    // }
                     return null;
                   })}
                 </div>
               </div>
             ))
+          )}
+          {isLoading && toolActivities.length > 0 && (
+            <div className="max-w-3xl mx-auto px-4 py-4 rounded-2xl border border-border-subtle bg-surface-default/70 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-accent-blue" />
+                  <p className="text-sm font-medium text-text-primary">Agent actions in progress</p>
+                </div>
+                <span className="text-[11px] text-text-tertiary">
+                  {toolActivities.filter(t => t.status !== 'running').length}/{toolActivities.length} done
+                </span>
+              </div>
+
+              <div className="h-1.5 w-full rounded-full bg-bg-secondary overflow-hidden mb-3">
+                <div
+                  className="h-full bg-accent-blue transition-all duration-300"
+                  style={{
+                    width: `${
+                      toolActivities.length
+                        ? Math.round(
+                            (toolActivities.filter(t => t.status !== 'running').length /
+                              toolActivities.length) * 100,
+                          )
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                {toolActivities.map(item => (
+                  <div
+                    key={item.toolCallId}
+                    className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-secondary/80 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {item.status === 'running' && (
+                        <Loader2 className="w-3.5 h-3.5 text-accent-blue animate-spin shrink-0" />
+                      )}
+                      {item.status === 'completed' && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-accent-green shrink-0" />
+                      )}
+                      {item.status === 'failed' && (
+                        <AlertCircle className="w-3.5 h-3.5 text-accent-red shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-text-primary truncate">
+                          {normalizeToolName(item.toolName)}
+                        </p>
+                        <p className="text-[11px] text-text-tertiary truncate">{item.summary}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-text-tertiary shrink-0 ml-2">
+                      {typeof item.durationMs === 'number' ? `${item.durationMs}ms` : item.status === 'running' ? 'running' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
           {isLoading && messages[messages.length - 1]?.role === 'user' && (
             <div className="flex gap-4 max-w-3xl mx-auto">
