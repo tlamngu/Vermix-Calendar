@@ -6,10 +6,10 @@
   --color-bg-tertiary: #1a1a1a;
   --color-bg-quaternary: #222222;
 
-  --color-surface-default: rgba(255, 255, 255, 0.03);
-  --color-surface-hover: rgba(255, 255, 255, 0.06);
-  --color-surface-active: rgba(255, 255, 255, 0.10);
-  --color-surface-selected: rgba(255, 255, 255, 0.12);
+  --color-surface-default: rgba(25, 25, 25, 0.9);
+  --color-surface-hover: rgba(25, 25, 25, 1);
+  --color-surface-active: rgba(25, 25, 25, 1);
+  --color-surface-selected: rgba(25, 25, 25, 0.6);
 
   --color-border-subtle: rgba(255, 255, 255, 0.06);
   --color-border-default: rgba(255, 255, 255, 0.10);

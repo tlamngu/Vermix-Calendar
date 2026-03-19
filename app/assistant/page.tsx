@@ -597,7 +597,7 @@ export default function AssistantPage() {
   };
 
   return (
-    <div className="fixed inset-0 sm:relative sm:h-full sm:w-full bg-bg-primary sm:rounded-xl overflow-hidden border border-border-subtle flex flex-col sm:flex-row">
+    <div className="sm:relative h-full sm:w-full bg-bg-primary sm:rounded-xl overflow-hidden border border-border-subtle flex flex-col sm:flex-row">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -652,7 +652,7 @@ export default function AssistantPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-0 bg-bg-primary relative w-full sm:min-h-full">
+      <div className="flex-1 flex flex-col min-h-0 bg-bg-primary relative w-full max-h-full ">
         {/* Chat Header */}
         <div className="h-14 border-b border-border-subtle flex items-center px-3 sm:px-4 justify-between bg-bg-primary/80 backdrop-blur-sm z-10 shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -716,7 +716,7 @@ export default function AssistantPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-3 sm:p-6 space-y-6 w-full">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 w-full h-full">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4 opacity-50 px-3 sm:px-4">
               <div className="w-12 sm:w-16 h-12 sm:h-16 rounded-full bg-surface-active flex items-center justify-center">
