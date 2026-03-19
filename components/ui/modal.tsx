@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
@@ -12,6 +13,20 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (

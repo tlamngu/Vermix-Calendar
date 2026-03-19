@@ -26,7 +26,7 @@ export function Sidebar() {
     <>
       <motion.div 
         layout
-        className="h-[clamp(64px,8vh,80px)] bg-bg-secondary/90 backdrop-blur-md border-t border-border-subtle flex items-center justify-around px-2 z-40 sm:w-[70px] sm:h-full sm:flex-col sm:border-t-0 sm:border-r sm:py-4 sm:justify-start order-last sm:order-first"
+        className="h-[clamp(64px,8vh,80px)] bg-bg-secondary/90 backdrop-blur-md border-t border-border-subtle flex items-center justify-around px-2 z-40 sm:w-[70px] sm:h-full sm:flex-col sm:border-t-0 sm:border-r sm:py-4 sm:justify-start order-last sm:order-first sm:overflow-y-auto [webkit-overflow-scrolling:touch]"
       >
         <div className="hidden sm:flex w-[70px] h-[70px] items-center justify-center mb-8">
           <div className="w-10 h-10 bg-accent-blue/20 flex items-center justify-center">

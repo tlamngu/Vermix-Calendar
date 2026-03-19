@@ -468,7 +468,7 @@ export function TaskList() {
   const cancelledTasks = filteredTasks.filter(t => t.status === 'cancelled');
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto sm:p-0 p-4">
       <div className="mb-[var(--space-base)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[var(--space-base)] gap-4">
           <div className="flex items-center gap-4">

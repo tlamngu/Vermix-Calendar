@@ -342,7 +342,7 @@ export function CalendarView() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full max-w-6xl mx-auto sm:p-0 p-4">
       {renderHeader()}
       {loading ? (
         <div className="space-y-4">

@@ -597,30 +597,30 @@ export default function AssistantPage() {
   };
 
   return (
-    <div className="h-full w-full bg-bg-primary sm:rounded-xl overflow-hidden border border-border-subtle flex flex-col sm:flex-row">
+    <div className="fixed inset-0 sm:relative sm:h-full sm:w-full bg-bg-primary sm:rounded-xl overflow-hidden border border-border-subtle flex flex-col sm:flex-row">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
-          className="absolute inset-0 bg-black/50 z-20 sm:hidden"
+          className="fixed inset-0 bg-black/50 z-20 sm:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <div className={cn(
-        "absolute sm:relative w-64 h-full bg-bg-secondary border-r border-border-subtle flex flex-col transition-transform duration-300 z-30",
+        "fixed sm:relative w-64 h-full sm:h-auto bg-bg-secondary border-r border-border-subtle flex flex-col transition-transform duration-300 z-30 top-0 left-0",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full sm:translate-x-0"
       )}>
-        <div className="p-4 border-b border-border-subtle flex items-center justify-between">
-          <h2 className="font-semibold text-text-primary flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent-blue" />
-            Chats
+        <div className="p-2 sm:p-4 border-b border-border-subtle flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-text-primary flex items-center gap-1.5 sm:gap-2 text-sm truncate">
+            <Sparkles className="w-3 sm:w-4 h-3 sm:h-4 text-accent-blue shrink-0" />
+            <span className="truncate">Chats</span>
           </h2>
-          <Button variant="ghost" onClick={createNewSession} className="h-8 w-8 p-0">
-            <Plus className="w-4 h-4" />
+          <Button variant="ghost" onClick={createNewSession} className="h-7 sm:h-8 w-7 sm:w-8 p-0 shrink-0">
+            <Plus className="w-3 sm:w-4 h-3 sm:h-4" />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto p-1.5 sm:p-2 space-y-0.5 sm:space-y-1">
           {sessions.map(session => (
             <div 
               key={session.id}
@@ -629,43 +629,43 @@ export default function AssistantPage() {
                 setIsSidebarOpen(false);
               }}
               className={cn(
-                "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors group",
+                "flex items-center justify-between p-2 sm:p-3 rounded-lg cursor-pointer transition-colors group",
                 currentSessionId === session.id ? "bg-surface-active text-text-primary" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
               )}
             >
-              <span className="truncate text-sm">{session.title}</span>
+              <span className="truncate text-xs sm:text-sm">{session.title}</span>
               <button 
                 onClick={(e) => deleteSession(session.id, e)}
-                className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-accent-red transition-opacity"
+                className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-accent-red transition-opacity shrink-0"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3 sm:w-4 h-3 sm:h-4" />
               </button>
             </div>
           ))}
         </div>
-        <div className="p-4 border-t border-border-subtle">
-          <Button variant="secondary" className="w-full flex items-center justify-center gap-2" onClick={() => setIsSettingsOpen(true)}>
-            <Settings className="w-4 h-4" />
-            AI Settings
+        <div className="p-2 sm:p-4 border-t border-border-subtle">
+          <Button variant="secondary" className="w-full flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10" onClick={() => setIsSettingsOpen(true)}>
+            <Settings className="w-3 sm:w-4 h-3 sm:h-4" />
+            <span className="truncate">Settings</span>
           </Button>
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full bg-bg-primary relative">
+      <div className="flex-1 flex flex-col min-h-0 bg-bg-primary relative w-full sm:min-h-full">
         {/* Chat Header */}
-        <div className="h-14 border-b border-border-subtle flex items-center px-4 justify-between bg-bg-primary/80 backdrop-blur-sm z-10">
-          <div className="flex items-center gap-3">
-            <button className="sm:hidden text-text-secondary hover:text-text-primary" onClick={() => setIsSidebarOpen(true)}>
-              <Menu className="w-5 h-5" />
+        <div className="h-14 border-b border-border-subtle flex items-center px-3 sm:px-4 justify-between bg-bg-primary/80 backdrop-blur-sm z-10 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button className="sm:hidden text-text-secondary hover:text-text-primary p-1" onClick={() => setIsSidebarOpen(true)}>
+              <Menu className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-accent-blue/20 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-accent-blue" />
+            <div className="flex items-center gap-1 sm:gap-2">
+              <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
+                <Bot className="w-3 sm:w-4 h-3 sm:h-4 text-accent-blue" />
               </div>
-              <div>
-                <h1 className="font-medium text-text-primary text-sm">Vermix Assistant</h1>
-                <p className="text-[10px] text-text-tertiary">Powered by {activeSettings?.model || 'AI'}</p>
+              <div className="min-w-0">
+                <h1 className="font-medium text-text-primary text-xs sm:text-sm truncate">Vermix Assistant</h1>
+                <p className="text-[9px] sm:text-[10px] text-text-tertiary truncate">Powered by {activeSettings?.model || 'AI'}</p>
               </div>
             </div>
           </div>
@@ -674,40 +674,40 @@ export default function AssistantPage() {
           <div className="relative">
             <Button 
               variant="ghost" 
-              className="h-9 px-3 flex items-center gap-2 text-xs font-medium text-text-secondary hover:text-text-primary"
+              className="h-8 sm:h-9 px-2 sm:px-3 flex items-center gap-1 text-xs font-medium text-text-secondary hover:text-text-primary"
               onClick={() => setIsQuickSelectOpen(!isQuickSelectOpen)}
             >
-              <span className="truncate max-w-[100px]">{activeSettings?.name || 'Select Provider'}</span>
-              <ChevronDown className={cn("w-3 h-3 transition-transform", isQuickSelectOpen && "rotate-180")} />
+              <span className="truncate max-w-[60px] sm:max-w-[100px]">{activeSettings?.name || 'Provider'}</span>
+              <ChevronDown className={cn("w-2.5 h-2.5 sm:w-3 sm:h-3 transition-transform shrink-0", isQuickSelectOpen && "rotate-180")} />
             </Button>
 
             {isQuickSelectOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsQuickSelectOpen(false)} />
-                <div className="absolute right-0 mt-1 w-48 bg-surface-default border border-border-subtle rounded-lg shadow-xl z-50 py-1">
+                <div className="absolute right-0 mt-1 w-40 sm:w-48 bg-surface-default border border-border-subtle rounded-lg shadow-xl z-50 py-1 max-h-64 overflow-y-auto">
                   {allSettings.map(s => (
                     <button
                       key={s.id}
                       className={cn(
-                        "w-full text-left px-4 py-2 text-xs hover:bg-surface-hover transition-colors flex items-center justify-between",
+                        "w-full text-left px-3 sm:px-4 py-1.5 sm:py-2 text-xs hover:bg-surface-hover transition-colors flex items-center justify-between gap-2",
                         activeSettings?.id === s.id ? "text-accent-blue font-medium bg-accent-blue/5" : "text-text-primary"
                       )}
                       onClick={() => switchActiveProvider(s)}
                     >
-                      <span className="truncate">{s.name}</span>
-                      {activeSettings?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-accent-blue" />}
+                      <span className="truncate text-xs">{s.name}</span>
+                      {activeSettings?.id === s.id && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-accent-blue shrink-0" />}
                     </button>
                   ))}
-                  <div className="h-px bg-border-subtle my-1" />
+                  <div className="h-px bg-border-subtle my-0.5 sm:my-1" />
                   <button
-                    className="w-full text-left px-4 py-2 text-xs text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors flex items-center gap-2"
+                    className="w-full text-left px-3 sm:px-4 py-1.5 sm:py-2 text-xs text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors flex items-center gap-2"
                     onClick={() => {
                       setIsSettingsOpen(true);
                       setIsQuickSelectOpen(false);
                     }}
                   >
-                    <Settings className="w-3 h-3" />
-                    Manage Providers
+                    <Settings className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
+                    Manage
                   </button>
                 </div>
               </>
@@ -716,20 +716,20 @@ export default function AssistantPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto min-h-0 p-3 sm:p-6 space-y-6 w-full">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
-              <div className="w-16 h-16 rounded-full bg-surface-active flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-text-secondary" />
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4 opacity-50 px-3 sm:px-4">
+              <div className="w-12 sm:w-16 h-12 sm:h-16 rounded-full bg-surface-active flex items-center justify-center">
+                <Sparkles className="w-6 sm:w-8 h-6 sm:h-8 text-text-secondary" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-text-primary mb-1">How can I help you today?</h3>
-                <p className="text-sm text-text-secondary max-w-sm">I can help you manage your calendar, create tasks, and remember important details.</p>
+                <h3 className="text-base sm:text-lg font-medium text-text-primary mb-0.5 sm:mb-1">How can I help you today?</h3>
+                <p className="text-xs sm:text-sm text-text-secondary max-w-sm">I can help you manage your calendar, create tasks, and remember important details.</p>
               </div>
             </div>
           ) : (
             messages.map(m => (
-              <div key={m.id} className={cn("flex gap-4 max-w-3xl mx-auto", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
+              <div key={m.id} className={cn("flex gap-2 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
                 <div className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
                   m.role === 'user' ? "bg-surface-active" : "bg-accent-blue/20"
@@ -737,13 +737,13 @@ export default function AssistantPage() {
                   {m.role === 'user' ? <div className="text-xs font-medium">U</div> : <Bot className="w-4 h-4 text-accent-blue" />}
                 </div>
                 <div className={cn(
-                  "px-4 py-3 rounded-2xl max-w-[85%]",
-                  m.role === 'user' ? "bg-surface-active text-text-primary rounded-tr-sm" : "bg-surface-default text-text-secondary"
+                  "px-3 sm:px-4 py-2 sm:py-3 rounded-2xl text-sm break-words",
+                  m.role === 'user' ? "bg-surface-active text-text-primary rounded-tr-sm max-w-[85%]" : "bg-surface-default text-text-secondary max-w-[90%]"
                 )}>
                   {m.parts?.map((part, i) => {
                     if (part.type === 'text') {
                       return (
-                        <div key={i} className="markdown-body text-sm leading-relaxed">
+                        <div key={i} className="markdown-body text-xs sm:text-sm leading-relaxed">
                           {renderMessageContent(part.text)}
                         </div>
                       );
@@ -771,18 +771,18 @@ export default function AssistantPage() {
             ))
           )}
           {isLoading && toolActivities.length > 0 && (
-            <div className="max-w-3xl mx-auto px-4 py-4 rounded-2xl border border-border-subtle bg-surface-default/70 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-accent-blue" />
-                  <p className="text-sm font-medium text-text-primary">Agent actions in progress</p>
+            <div className="max-w-3xl mx-auto px-2 sm:px-4 py-3 sm:py-4 rounded-2xl border border-border-subtle bg-surface-default/70 backdrop-blur-sm w-full">
+              <div className="flex items-center justify-between mb-2 sm:mb-3 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="w-3 sm:w-4 h-3 sm:h-4 text-accent-blue shrink-0" />
+                  <p className="text-xs sm:text-sm font-medium text-text-primary truncate">Agent actions</p>
                 </div>
-                <span className="text-[11px] text-text-tertiary">
+                <span className="text-[10px] sm:text-[11px] text-text-tertiary shrink-0">
                   {toolActivities.filter(t => t.status !== 'running').length}/{toolActivities.length} done
                 </span>
               </div>
 
-              <div className="h-1.5 w-full rounded-full bg-bg-secondary overflow-hidden mb-3">
+              <div className="h-1 sm:h-1.5 w-full rounded-full bg-bg-secondary overflow-hidden mb-2 sm:mb-3">
                 <div
                   className="h-full bg-accent-blue transition-all duration-300"
                   style={{
@@ -798,30 +798,30 @@ export default function AssistantPage() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {toolActivities.map(item => (
                   <div
                     key={item.toolCallId}
-                    className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-secondary/80 px-3 py-2"
+                    className="flex items-center justify-between gap-2 rounded-lg sm:rounded-xl border border-border-subtle bg-bg-secondary/80 px-2 sm:px-3 py-1.5 sm:py-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                       {item.status === 'running' && (
-                        <Loader2 className="w-3.5 h-3.5 text-accent-blue animate-spin shrink-0" />
+                        <Loader2 className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-accent-blue animate-spin shrink-0" />
                       )}
                       {item.status === 'completed' && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-accent-green shrink-0" />
+                        <CheckCircle2 className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-accent-green shrink-0" />
                       )}
                       {item.status === 'failed' && (
-                        <AlertCircle className="w-3.5 h-3.5 text-accent-red shrink-0" />
+                        <AlertCircle className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-accent-red shrink-0" />
                       )}
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-text-primary truncate">
+                        <p className="text-xs sm:text-xs font-medium text-text-primary truncate">
                           {normalizeToolName(item.toolName)}
                         </p>
-                        <p className="text-[11px] text-text-tertiary truncate">{item.summary}</p>
+                        <p className="text-[10px] sm:text-[11px] text-text-tertiary truncate">{item.summary}</p>
                       </div>
                     </div>
-                    <span className="text-[10px] text-text-tertiary shrink-0 ml-2">
+                    <span className="text-[9px] sm:text-[10px] text-text-tertiary shrink-0">
                       {typeof item.durationMs === 'number' ? `${item.durationMs}ms` : item.status === 'running' ? 'running' : ''}
                     </span>
                   </div>
@@ -830,14 +830,14 @@ export default function AssistantPage() {
             </div>
           )}
           {isLoading && messages[messages.length - 1]?.role === 'user' && (
-            <div className="flex gap-4 max-w-3xl mx-auto">
-              <div className="w-8 h-8 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-accent-blue" />
+            <div className="flex gap-3 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0">
+              <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
+                <Bot className="w-3 sm:w-4 h-3 sm:h-4 text-accent-blue" />
               </div>
-              <div className="px-4 py-3 text-text-tertiary text-sm flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-text-tertiary animate-bounce" />
-                <div className="w-2 h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.2s' }} />
-                <div className="w-2 h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.4s' }} />
+              <div className="px-3 sm:px-4 py-2 sm:py-3 text-text-tertiary text-xs sm:text-sm flex items-center gap-2">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" />
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.4s' }} />
               </div>
             </div>
           )}
@@ -845,29 +845,29 @@ export default function AssistantPage() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 bg-bg-primary border-t border-border-subtle shrink-0">
+        <div className="p-3 sm:p-4 bg-bg-primary border-t border-border-subtle shrink-0 w-full">
           <form onSubmit={onSubmit} className="max-w-3xl mx-auto relative flex items-center">
             <Input
               value={input}
               onChange={handleInputChange}
               placeholder={activeSettings?.api_key ? "Ask Vermix Assistant..." : "Configure AI Settings to start"}
               disabled={isLoading || !activeSettings?.api_key}
-              className="w-full pr-12 rounded-full bg-surface-default border-border-subtle focus:border-border-focus h-12"
+              className="w-full pr-12 rounded-full bg-surface-default border-border-subtle focus:border-border-focus h-11 sm:h-12 text-sm"
             />
             <Button 
               type="submit" 
               disabled={isLoading || !input.trim() || !activeSettings?.api_key}
               variant="icon"
-              className="absolute right-2 text-accent-blue hover:bg-accent-blue/10 w-8 h-8 rounded-full"
+              className="absolute right-2 text-accent-blue hover:bg-accent-blue/10 w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center"
             >
               <Send className="w-4 h-4" />
             </Button>
           </form>
-          <div className="flex items-center justify-between mt-2 max-w-3xl mx-auto">
-            <span className="text-[10px] text-text-tertiary">Vermix Assistant can make mistakes. Check important info.</span>
+          <div className="flex items-center justify-between gap-2 mt-2 max-w-3xl mx-auto text-[9px] sm:text-[10px]">
+            <span className="text-text-tertiary hidden sm:inline">Vermix Assistant can make mistakes. Check important info.</span>
             <button 
               onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-              className="text-[10px] font-medium text-text-tertiary hover:text-accent-blue flex items-center gap-1 transition-colors"
+              className="text-[9px] sm:text-[10px] font-medium text-text-tertiary hover:text-accent-blue flex items-center gap-1 transition-colors ml-auto"
             >
               <Menu className="w-3 h-3" />
               {isConsoleOpen ? 'Hide Console' : 'Show Console'}
@@ -877,7 +877,7 @@ export default function AssistantPage() {
 
         {/* Log Console */}
         {isConsoleOpen && (
-          <div className="h-48 bg-black/90 border-t border-white/10 flex flex-col font-mono text-[10px] shrink-0">
+          <div className="h-32 sm:h-48 bg-black/90 border-t border-white/10 flex flex-col font-mono text-[9px] sm:text-[10px] shrink-0 w-full">
             <div className="p-2 border-b border-white/10 flex items-center justify-between bg-white/5">
               <span className="text-white/50 uppercase tracking-widest">Agent Console</span>
               <div className="flex items-center gap-2">

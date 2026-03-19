@@ -33,14 +33,14 @@ export const viewport: Viewport = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={lexend.variable}>
-      <body suppressHydrationWarning className="bg-bg-primary text-text-primary min-h-screen flex flex-col">
+      <body suppressHydrationWarning className="bg-bg-primary text-text-primary min-h-screen flex flex-col overflow-hidden">
         <AuthProvider>
           <NotificationManager />
           <div className="flex flex-col sm:flex-row h-[100dvh] overflow-hidden">
             <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
               <Titlebar />
-              <main className="flex-1 overflow-y-auto overscroll-contain sm:p-[var(--space-base)] p-0 [webkit-overflow-scrolling:touch]">
+              <main className="flex-1 overflow-y-auto overscroll-contain sm:p-[var(--space-base)] [webkit-overflow-scrolling:touch] touch-pan-y">
                 <ClientLayout>
                   {children}
                 </ClientLayout>

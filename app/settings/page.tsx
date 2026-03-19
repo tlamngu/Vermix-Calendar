@@ -224,7 +224,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto sm:p-0 p-4">
       <h2 className="text-[var(--text-2xl)] font-semibold text-text-primary tracking-tight mb-6">Settings</h2>
       
       <div className="space-y-6">
