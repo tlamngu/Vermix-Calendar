@@ -7,10 +7,13 @@ import { LogOut, Key, Trash2, Copy, Bell } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTheme } from '@/components/theme-provider';
+import { Sun, Moon } from 'lucide-react';
 import Select from 'react-select';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mcpKeys, setMcpKeys] = useState<{ id: string, key: string, createdAt: string }[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState(15);
@@ -249,6 +252,34 @@ export default function SettingsPage() {
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
+          </Card>
+        </motion.div>
+
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+          <Card className="p-6">
+            <h3 className="text-[clamp(16px,2vw,18px)] font-medium text-text-primary mb-4">Appearance</h3>
+            <div className="flex items-center justify-between p-4 border border-border-subtle bg-bg-primary">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-accent-blue/10 flex items-center justify-center">
+                  {theme === 'dark' ? <Moon className="w-5 h-5 text-accent-blue" /> : <Sun className="w-5 h-5 text-accent-blue" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary capitalize">{theme} Mode</p>
+                  <p className="text-xs text-text-tertiary">Toggle between light and dark interface</p>
+                </div>
+              </div>
+              <Button 
+                variant="secondary" 
+                onClick={toggleTheme}
+                className="text-xs h-9 px-4"
+              >
+                Switch to {theme === 'dark' ? 'Light' : 'Dark'}
+              </Button>
+            </div>
           </Card>
         </motion.div>
 

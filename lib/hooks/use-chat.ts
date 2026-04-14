@@ -57,9 +57,9 @@ export function useChat({
       
       const data = await response.json();
       
-      // Wait a short moment to allow the backend to initialize the reply
-      // before turning off isLoading. Or rely on Realtime.
-      setTimeout(() => setIsLoading(false), 500);
+      // We turn off loading immediately. The actual message content 
+      // will be handled by the Realtime subscription in the page.
+      setIsLoading(false);
       
     } catch (error: any) {
       console.error('Chat API Error:', error);

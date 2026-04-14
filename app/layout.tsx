@@ -2,6 +2,7 @@ import type {Metadata, Viewport} from 'next';
 import { Lexend } from 'next/font/google';
 import './globals.css'; // Global styles
 import { AuthProvider } from '@/components/auth-provider';
+import { ThemeProvider } from '@/components/theme-provider';
 import { Sidebar } from '@/components/sidebar';
 import { Titlebar } from '@/components/titlebar';
 import { NotificationManager } from '@/components/notification-manager';
@@ -32,22 +33,24 @@ export const viewport: Viewport = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={lexend.variable}>
-      <body suppressHydrationWarning className="bg-bg-primary text-text-primary min-h-screen flex flex-col overflow-hidden">
-        <AuthProvider>
-          <NotificationManager />
-          <div className="flex flex-col sm:flex-row h-[100dvh] overflow-hidden">
-            <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              <Titlebar />
-              <main className="flex-1 overflow-y-auto overscroll-contain sm:p-[var(--space-base)] [webkit-overflow-scrolling:touch] touch-pan-y">
-                <ClientLayout>
-                  {children}
-                </ClientLayout>
-              </main>
+    <html lang="en" className={lexend.variable} suppressHydrationWarning>
+      <body suppressHydrationWarning className="min-h-screen flex flex-col overflow-hidden transition-colors duration-200">
+        <ThemeProvider>
+          <AuthProvider>
+            <NotificationManager />
+            <div className="flex flex-col sm:flex-row h-[100dvh] overflow-hidden">
+              <Sidebar />
+              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <Titlebar />
+                <main className="flex-1 overflow-y-auto overscroll-contain sm:p-[var(--space-base)] [webkit-overflow-scrolling:touch] touch-pan-y">
+                  <ClientLayout>
+                    {children}
+                  </ClientLayout>
+                </main>
+              </div>
             </div>
-          </div>
-        </AuthProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

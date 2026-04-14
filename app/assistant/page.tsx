@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { supabase } from '@/lib/supabase';
-import { useChat } from '@/lib/hooks/use-chat';
-import { Bot, Send, Settings, Plus, Trash2, Menu, X, Sparkles, Search, Loader2, ChevronDown, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useChat, type Message } from '@/lib/hooks/use-chat';
+import { useTheme } from '@/components/theme-provider';
+import { Bot, Send, Settings, Plus, Trash2, Menu, X, Sparkles, Search, Loader2, ChevronDown, RefreshCw, CheckCircle2, AlertCircle, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -101,8 +102,54 @@ const renderMessageContent = (text: string) => {
   });
 };
 
+// Memoized message component to prevent re-renders during streaming
+const ChatMessage = memo(({ m, renderMessageContent }: { m: Message, renderMessageContent: (text: string) => React.ReactNode }) => {
+  return (
+    <div className={cn("flex gap-2 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
+      <div className={cn(
+        "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+        m.role === 'user' ? "bg-surface-active" : "bg-accent-blue/20"
+      )}>
+        {m.role === 'user' ? <div className="text-xs font-medium">U</div> : <Bot className="w-4 h-4 text-accent-blue" />}
+      </div>
+      <div className={cn(
+        "px-3 sm:px-4 py-2 sm:py-3 rounded-2xl text-sm break-words",
+        m.role === 'user' ? "bg-surface-active text-text-primary rounded-tr-sm max-w-[85%]" : "bg-surface-default text-text-secondary max-w-[90%]"
+      )}>
+        {m.role === 'assistant' && (!m.content && (!m.parts || m.parts.length === 0 || (m.parts.length === 1 && m.parts[0].type === 'text' && !m.parts[0].text))) && (
+          <div className="flex items-center gap-2 text-text-tertiary h-5 sm:h-6">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" />
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.2s' }} />
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.4s' }} />
+          </div>
+        )}
+        {m.parts?.map((part: any, i: number) => {
+          if (part.type === 'text' && part.text) {
+            return (
+              <div key={i} className="markdown-body text-xs sm:text-sm leading-relaxed">
+                {renderMessageContent(part.text)}
+              </div>
+            );
+          }
+          if (part.type === 'tool-invocation' && part.status === 'running') {
+            return (
+              <div key={i} className="text-xs text-text-tertiary italic flex items-center gap-2 mt-1">
+                <Sparkles className="w-3 h-3 animate-pulse text-accent-blue" />
+                <span className="text-xs italic">Working on it...</span>
+              </div>
+            );
+          }
+          return null;
+        })}
+      </div>
+    </div>
+  );
+});
+ChatMessage.displayName = 'ChatMessage';
+
 export default function AssistantPage() {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [allSettings, setAllSettings] = useState<AISettings[]>([]);
   const [activeSettings, setActiveSettings] = useState<AISettings | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -127,20 +174,32 @@ export default function AssistantPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   
-  // Log console state
   const [logs, setLogs] = useState<{ type: 'info' | 'error' | 'process', message: string, timestamp: Date }[]>([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastScrollTime = useRef(0);
 
   const addLog = useCallback((type: 'info' | 'error' | 'process', message: string) => {
     setLogs(prev => [...prev, { type, message, timestamp: new Date() }].slice(-50));
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (messagesEndRef.current) {
+      const now = Date.now();
+      // Throttle scrolling to avoid layout thrashing on mobile
+      if (now - lastScrollTime.current < 100) return;
+      lastScrollTime.current = now;
+
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: smooth ? 'smooth' : 'auto',
+        block: 'end'
+      });
+    }
+  }, []);
+
 
   const [input, setInput] = useState('');
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setInput(e.target.value);
@@ -447,6 +506,22 @@ export default function AssistantPage() {
     scrollToBottom();
   }, [messages]);
 
+  // Safety fallback for Realtime sync issues (common on mobile/flaky networks)
+  useEffect(() => {
+    if (!isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && currentSessionId) {
+      const timer = setTimeout(() => {
+        // Double check condition after delay
+        setMessages(prev => {
+          if (prev.length > 0 && prev[prev.length - 1].role === 'user') {
+            loadMessages(currentSessionId);
+          }
+          return prev;
+        });
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, messages, currentSessionId, loadMessages, setMessages]);
+
   const testConnection = async () => {
     if (!providerUrl || !apiKey) {
       setTestResult({ success: false, message: 'Provider URL and API Key are required' });
@@ -702,7 +777,10 @@ export default function AssistantPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 w-full h-full">
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 w-full h-full will-change-transform scroll-smooth overscroll-contain [transform:translateZ(0)]"
+        >
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-3 sm:space-y-4 opacity-50 px-3 sm:px-4">
               <div className="w-12 sm:w-16 h-12 sm:h-16 rounded-full bg-surface-active flex items-center justify-center">
@@ -715,52 +793,7 @@ export default function AssistantPage() {
             </div>
           ) : (
             messages.map(m => (
-              <div key={m.id} className={cn("flex gap-2 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                  m.role === 'user' ? "bg-surface-active" : "bg-accent-blue/20"
-                )}>
-                  {m.role === 'user' ? <div className="text-xs font-medium">U</div> : <Bot className="w-4 h-4 text-accent-blue" />}
-                </div>
-                <div className={cn(
-                  "px-3 sm:px-4 py-2 sm:py-3 rounded-2xl text-sm break-words",
-                  m.role === 'user' ? "bg-surface-active text-text-primary rounded-tr-sm max-w-[85%]" : "bg-surface-default text-text-secondary max-w-[90%]"
-                )}>
-                  {m.role === 'assistant' && (!m.content && (!m.parts || m.parts.length === 0 || (m.parts.length === 1 && m.parts[0].type === 'text' && !m.parts[0].text))) && (
-                    <div className="flex items-center gap-2 text-text-tertiary h-5 sm:h-6">
-                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" />
-                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.2s' }} />
-                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-text-tertiary animate-bounce" style={{ animationDelay: '0.4s' }} />
-                    </div>
-                  )}
-                  {m.parts?.map((part, i) => {
-                    if (part.type === 'text' && part.text) {
-                      return (
-                        <div key={i} className="markdown-body text-xs sm:text-sm leading-relaxed">
-                          {renderMessageContent(part.text)}
-                        </div>
-                      );
-                    }
-                    if (part.type === 'tool-invocation' && part.status === 'running') {
-                      return (
-                        <div key={i} className="text-xs text-text-tertiary italic flex items-center gap-2 mt-1">
-                          <Sparkles className="w-3 h-3 animate-pulse text-accent-blue" />
-                          <span className="text-xs italic">Working on it...</span>
-                        </div>
-                      );
-                    }
-                    // if (part.type === 'tool_result') {
-                    //   return (
-                    //     <div key={i} className="text-xs bg-surface-active p-2 rounded-md mt-2">
-                    //       <span className="font-medium text-accent-blue">Tool: {part.toolName}</span>
-                    //       <pre className="text-[10px] mt-1 overflow-x-auto">{JSON.stringify(part.result, null, 2)}</pre>
-                    //     </div>
-                    //   );
-                    // }
-                    return null;
-                  })}
-                </div>
-              </div>
+              <ChatMessage key={m.id} m={m} renderMessageContent={renderMessageContent} />
             ))
           )}
           {isGenerating && toolActivities.length > 0 && (
@@ -822,7 +855,7 @@ export default function AssistantPage() {
               </div>
             </div>
           )}
-          {(isLoading || (messages.length > 0 && messages[messages.length - 1].role === 'user')) && (
+          {((isLoading && messages[messages.length - 1]?.role === 'user') || (messages.length > 0 && messages[messages.length - 1].role === 'user')) && (
             <div className="flex gap-3 sm:gap-4 max-w-3xl mx-auto w-full px-1 sm:px-0 mt-4">
               <div className="w-6 sm:w-8 h-6 sm:h-8 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
                 <Bot className="w-3 sm:w-4 h-3 sm:h-4 text-accent-blue" />
@@ -886,13 +919,13 @@ export default function AssistantPage() {
 
         {/* Log Console */}
         {isConsoleOpen && (
-          <div className="h-32 sm:h-48 bg-black/90 border-t border-white/10 flex flex-col font-mono text-[9px] sm:text-[10px] shrink-0 w-full">
-            <div className="p-2 border-b border-white/10 flex items-center justify-between bg-white/5">
-              <span className="text-white/50 uppercase tracking-widest">Agent Console</span>
+          <div className="h-32 sm:h-48 bg-bg-quaternary border-t border-border-default flex flex-col font-mono text-[9px] sm:text-[10px] shrink-0 w-full">
+            <div className="p-2 border-b border-border-subtle flex items-center justify-between bg-surface-default">
+              <span className="text-text-secondary uppercase tracking-widest">Agent Console</span>
               <div className="flex items-center gap-2">
-                <button onClick={() => setLogs([])} className="text-white/30 hover:text-white transition-colors">Clear</button>
-                <button onClick={() => setIsConsoleOpen(false)} className="text-white/30 hover:text-white transition-colors">
-                  <X className="w-3 h-3" />
+                <button onClick={() => setLogs([])} className="text-text-tertiary hover:text-text-primary transition-colors">Clear</button>
+                <button onClick={() => setIsConsoleOpen(false)} className="text-text-tertiary hover:text-text-primary transition-colors">
+                   <X className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -900,14 +933,14 @@ export default function AssistantPage() {
               {logs.map((log, i) => (
                 <div key={i} className={cn(
                   "flex gap-2",
-                  log.type === 'error' ? "text-red-400" : log.type === 'process' ? "text-blue-400" : "text-green-400"
+                  log.type === 'error' ? "text-accent-red" : log.type === 'process' ? "text-accent-blue" : "text-accent-green"
                 )}>
-                  <span className="text-white/20 shrink-0">[{log.timestamp.toLocaleTimeString([], { hour12: false })}]</span>
+                  <span className="text-text-disabled shrink-0">[{log.timestamp.toLocaleTimeString([], { hour12: false })}]</span>
                   <span className="shrink-0 uppercase font-bold">[{log.type}]</span>
                   <span className="break-all">{log.message}</span>
                 </div>
               ))}
-              {logs.length === 0 && <div className="text-white/20 italic">No logs captured yet...</div>}
+              {logs.length === 0 && <div className="text-text-disabled italic">No logs captured yet...</div>}
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -917,6 +950,31 @@ export default function AssistantPage() {
       {/* Settings Modal */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="AI Provider Management">
         <div className="space-y-6">
+          {/* Theme Toggle Section */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Appearance</h3>
+            <div className="flex items-center justify-between p-3 border border-border-subtle bg-bg-secondary">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-accent-blue/10 flex items-center justify-center">
+                  {theme === 'dark' ? <Moon className="w-4 h-4 text-accent-blue" /> : <Sun className="w-4 h-4 text-accent-blue" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary capitalize">{theme} Mode</p>
+                  <p className="text-[10px] text-text-tertiary">Set your preferred interface style</p>
+                </div>
+              </div>
+              <Button 
+                variant="secondary" 
+                onClick={toggleTheme}
+                className="text-xs h-8 px-3"
+              >
+                Switch to {theme === 'dark' ? 'Light' : 'Dark'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="h-px bg-border-subtle" />
+
           {/* List of Providers */}
           <div className="space-y-2">
             <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Saved Providers</h3>
